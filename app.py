@@ -14,6 +14,25 @@ from physics import SimulationConfig, estimate_terminal_velocity, simulate_fall
 from wind import WindConfig
 
 
+ANIMATION_FRAME_DURATION_MS = 55
+ANIMATION_PLOTLY_CONFIG = {
+    "displayModeBar": True,
+    "displaylogo": False,
+    "scrollZoom": False,
+    "doubleClick": False,
+    "modeBarButtonsToRemove": [
+        "zoom2d",
+        "pan2d",
+        "select2d",
+        "lasso2d",
+        "zoomIn2d",
+        "zoomOut2d",
+        "autoScale2d",
+        "resetScale2d",
+    ],
+}
+
+
 st.set_page_config(
     page_title="Simulador de Queda Livre",
     page_icon="🪂",
@@ -50,7 +69,6 @@ def build_visual_animation_figure(
     full_df: pd.DataFrame,
     object_name: str,
     air_resistance: bool,
-    frame_duration_ms: int,
 ) -> go.Figure:
     """Cria uma animação visual 2D usando os frames nativos do Plotly."""
     anim_df = sample_simulation_frames(full_df, max_frames=120)
@@ -194,23 +212,25 @@ def build_visual_animation_figure(
             xanchor="left",
         ),
         showlegend=False,
+        dragmode=False,
         xaxis=dict(
             range=[scene_x_min, panel_x_max],
             showgrid=False,
             zeroline=False,
             title="",
             showticklabels=False,
+            fixedrange=True,
         ),
         yaxis=dict(
             range=[ground_bottom, scene_y_max * 1.08],
             showgrid=False,
             zeroline=False,
             title="",
+            fixedrange=True,
         ),
         plot_bgcolor="#EAF7FF",
         paper_bgcolor="white",
         shapes=[
-            # Céu
             dict(
                 type="rect",
                 x0=scene_x_min,
@@ -221,7 +241,6 @@ def build_visual_animation_figure(
                 line=dict(width=0),
                 layer="below",
             ),
-            # Solo
             dict(
                 type="rect",
                 x0=scene_x_min,
@@ -232,7 +251,6 @@ def build_visual_animation_figure(
                 line=dict(width=0),
                 layer="below",
             ),
-            # Linha superior do solo
             dict(
                 type="line",
                 x0=scene_x_min,
@@ -242,7 +260,6 @@ def build_visual_animation_figure(
                 line=dict(width=5, color="#33691E"),
                 layer="above",
             ),
-            # Painel lateral
             dict(
                 type="rect",
                 x0=panel_x_min,
@@ -280,6 +297,10 @@ def build_visual_animation_figure(
                 "y": -0.08,
                 "xanchor": "left",
                 "yanchor": "top",
+                "bgcolor": "#1D4ED8",
+                "bordercolor": "#1E40AF",
+                "borderwidth": 2,
+                "font": {"color": "#FFFFFF", "size": 14},
                 "buttons": [
                     {
                         "label": "▶ Play",
@@ -287,7 +308,10 @@ def build_visual_animation_figure(
                         "args": [
                             None,
                             {
-                                "frame": {"duration": frame_duration_ms, "redraw": True},
+                                "frame": {
+                                    "duration": ANIMATION_FRAME_DURATION_MS,
+                                    "redraw": True,
+                                },
                                 "fromcurrent": True,
                                 "transition": {"duration": 0},
                                 "mode": "immediate",
@@ -318,10 +342,13 @@ def build_visual_animation_figure(
                 "yanchor": "top",
                 "len": 0.76,
                 "pad": {"t": 0, "b": 0},
+                "bgcolor": "#E5E7EB",
+                "activebgcolor": "#1D4ED8",
+                "bordercolor": "#CBD5E1",
                 "currentvalue": {
                     "prefix": "Tempo: ",
                     "suffix": "",
-                    "font": {"size": 14},
+                    "font": {"size": 14, "color": "#111827"},
                 },
                 "steps": slider_steps,
             }
@@ -473,21 +500,16 @@ st.divider()
 st.subheader("Animação visual 2D")
 st.caption("Cena simplificada com céu, solo, corpo em queda, rastro e painel lateral. Use o botão Play do próprio gráfico.")
 
-frame_duration_ms = st.slider(
-    "Velocidade da animação nativa do Plotly (ms por quadro)",
-    min_value=20,
-    max_value=180,
-    value=55,
-    step=5,
-)
-
 animation_fig = build_visual_animation_figure(
     full_df=df,
     object_name=falling_object.name,
     air_resistance=use_air_resistance,
-    frame_duration_ms=frame_duration_ms,
 )
-st.plotly_chart(animation_fig, use_container_width=True)
+st.plotly_chart(
+    animation_fig,
+    use_container_width=True,
+    config=ANIMATION_PLOTLY_CONFIG,
+)
 
 st.divider()
 left, right = st.columns(2)
