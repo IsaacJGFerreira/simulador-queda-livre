@@ -37,6 +37,8 @@ VECTOR_RESULTANT_COLOR = "#7E22CE"
 VECTOR_X_COLOR = "#2563EB"
 VECTOR_Y_COLOR = "#DC2626"
 OBJECT_COLOR = "#FF7043"
+HEIGHT_COLOR = "#22D3EE"
+DISTANCE_COLOR = "#34D399"
 DARK_BG = "#0E1117"
 DARK_GRID = "#374151"
 DARK_TEXT = "#F9FAFB"
@@ -46,6 +48,77 @@ st.set_page_config(
     page_title="Simulador de Queda Livre",
     page_icon="🪂",
     layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 1.4rem;
+        padding-bottom: 2rem;
+        max-width: 1500px;
+    }
+    .hero-card {
+        background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 55%, #38BDF8 100%);
+        padding: 26px 32px;
+        border-radius: 22px;
+        color: white;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+        margin-bottom: 18px;
+    }
+    .hero-title {
+        font-size: 2.35rem;
+        font-weight: 850;
+        margin-bottom: 8px;
+        letter-spacing: -0.03em;
+    }
+    .hero-subtitle {
+        font-size: 1.08rem;
+        opacity: 0.94;
+        max-width: 980px;
+        line-height: 1.45;
+    }
+    .section-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 18px;
+        padding: 18px 22px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+        margin: 12px 0 18px 0;
+    }
+    .section-title {
+        font-size: 1.28rem;
+        font-weight: 780;
+        color: #111827;
+        margin-bottom: 4px;
+    }
+    .section-subtitle {
+        font-size: 0.98rem;
+        color: #4B5563;
+        line-height: 1.45;
+    }
+    div[data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 16px;
+        padding: 14px 16px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    }
+    div[data-testid="stMetricValue"] {
+        font-weight: 780;
+    }
+    [data-testid="stSidebar"] {
+        background: #F8FAFC;
+        border-right: 1px solid #E5E7EB;
+    }
+    .small-note {
+        color: #475569;
+        font-size: 0.94rem;
+        line-height: 1.45;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -65,10 +138,10 @@ def format_panel_text(row: pd.Series, object_name: str, gravity: float) -> str:
         f"<b>{object_name}</b><br><br>"
         f"⏱ <b>Tempo:</b> {row['t']:.2f} s<br>"
         f"↕ <b>Altura:</b> {row['y']:.2f} m<br>"
+        f"↔ <b>Distância:</b> {row['x']:.2f} m<br>"
         f"⚡ <b>|v|:</b> {row['speed']:.2f} m/s<br>"
         f"<span style='color:{VECTOR_X_COLOR}'><b>vₓ:</b></span> {row['vx']:.2f} m/s<br>"
         f"<span style='color:{VECTOR_Y_COLOR}'><b>vᵧ:</b></span> {row['vy']:.2f} m/s<br>"
-        f"➡ <b>Distância horizontal:</b> {row['x']:.2f} m<br>"
         f"⬇ <b>Aceleração:</b> {gravity:.2f} m/s²<br>"
         f"<br><b>Vetores:</b><br>"
         f"<span style='color:{VECTOR_RESULTANT_COLOR}'><b>roxo:</b></span> velocidade resultante<br>"
@@ -190,12 +263,38 @@ def build_vector_traces(row: pd.Series, vector_data: dict[str, object]) -> list[
     ]
 
 
+def style_dark_axes(fig: go.Figure, row: int, col: int, x_title: str, y_title: str) -> None:
+    """Aplica estilo escuro aos gráficos didáticos."""
+    fig.update_xaxes(
+        title=x_title,
+        gridcolor=DARK_GRID,
+        zerolinecolor=DARK_GRID,
+        color=DARK_TEXT,
+        title_font=dict(color=DARK_TEXT),
+        tickfont=dict(color=DARK_TEXT),
+        fixedrange=True,
+        row=row,
+        col=col,
+    )
+    fig.update_yaxes(
+        title=y_title,
+        gridcolor=DARK_GRID,
+        zerolinecolor=DARK_GRID,
+        color=DARK_TEXT,
+        title_font=dict(color=DARK_TEXT),
+        tickfont=dict(color=DARK_TEXT),
+        fixedrange=True,
+        row=row,
+        col=col,
+    )
+
+
 def build_animation_with_dark_graphs(
     full_df: pd.DataFrame,
     object_name: str,
     gravity: float,
 ) -> go.Figure:
-    """Animação no estilo anterior, mas com gráficos escuros construídos simultaneamente."""
+    """Animação com cena grande e gráficos escuros construídos simultaneamente."""
     anim_df = sample_simulation_frames(full_df, max_frames=120)
 
     scene_y_max = max(float(anim_df["y"].max()), 1.0)
@@ -225,12 +324,13 @@ def build_animation_with_dark_graphs(
     scene_y_top = scene_y_max * 1.10 + 0.25 * vector_reference_length
 
     time_max = max(float(anim_df["t"].max()), 1e-9)
+    height_max = max(float(anim_df["y"].max()), 1.0)
+    distance_min = min(float(anim_df["x"].min()), 0.0)
+    distance_max = max(float(anim_df["x"].max()), 1.0)
+    distance_margin = max(0.5, 0.08 * (distance_max - distance_min if distance_max != distance_min else 1.0))
     velocity_min = min(float(anim_df["vy"].min()), float(anim_df["vx"].min()), 0.0)
     velocity_max = max(float(anim_df["speed"].max()), float(anim_df["vx"].max()), float(anim_df["vy"].max()), 1.0)
     velocity_margin = max(1.0, 0.10 * (velocity_max - velocity_min))
-    accel_min = min(float(anim_df["ay"].min()), -gravity, 0.0)
-    accel_max = max(float(anim_df["ay"].max()), -gravity, 0.0)
-    accel_margin = max(0.5, 0.20 * (accel_max - accel_min if accel_max != accel_min else abs(gravity)))
 
     initial = anim_df.iloc[0]
     initial_vector_data = vector_geometry(
@@ -243,16 +343,21 @@ def build_animation_with_dark_graphs(
 
     fig = make_subplots(
         rows=2,
-        cols=2,
+        cols=3,
+        specs=[
+            [{"colspan": 2}, None, {}],
+            [{}, {}, {}],
+        ],
         row_heights=[0.62, 0.38],
-        column_widths=[0.62, 0.38],
-        horizontal_spacing=0.07,
-        vertical_spacing=0.16,
+        column_widths=[0.34, 0.34, 0.32],
+        horizontal_spacing=0.06,
+        vertical_spacing=0.17,
         subplot_titles=(
             "Animação visual da queda livre com vetores",
             "Painel da queda",
             "Componentes da velocidade × tempo",
-            "Aceleração vertical × tempo",
+            "Altura × tempo",
+            "Distância horizontal × tempo",
         ),
     )
 
@@ -287,7 +392,7 @@ def build_animation_with_dark_graphs(
             showlegend=False,
         ),
         row=1,
-        col=2,
+        col=3,
     )
 
     fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["speed"]], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), name="|v| velocidade resultante"), row=2, col=1)
@@ -307,8 +412,11 @@ def build_animation_with_dark_graphs(
         col=1,
     )
 
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["ay"]], mode="lines", line=dict(width=4, color="#60A5FA"), name="aᵧ aceleração vertical"), row=2, col=2)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["ay"]], mode="markers", marker=dict(size=10, color="#60A5FA", line=dict(width=1, color="#F9FAFB")), name="aᵧ atual", hoverinfo="skip", showlegend=False), row=2, col=2)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"), row=2, col=2)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color="#F9FAFB")), name="altura atual", hoverinfo="skip", showlegend=False), row=2, col=2)
+
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"), row=2, col=3)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color="#F9FAFB")), name="distância atual", hoverinfo="skip", showlegend=False), row=2, col=3)
 
     frames: list[go.Frame] = []
     slider_steps = []
@@ -345,8 +453,10 @@ def build_animation_with_dark_graphs(
                     go.Scatter(x=chart_df["t"], y=chart_df["vx"], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), name="vₓ componente horizontal"),
                     go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color="#FCA5A5"), name="vᵧ componente vertical"),
                     go.Scatter(x=[row["t"], row["t"], row["t"]], y=[row["speed"], row["vx"], row["vy"]], mode="markers", marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, "#FCA5A5"], line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
-                    go.Scatter(x=chart_df["t"], y=chart_df["ay"], mode="lines", line=dict(width=4, color="#60A5FA"), name="aᵧ aceleração vertical"),
-                    go.Scatter(x=[row["t"]], y=[row["ay"]], mode="markers", marker=dict(size=10, color="#60A5FA", line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=chart_df["t"], y=chart_df["y"], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"),
+                    go.Scatter(x=[row["t"]], y=[row["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=chart_df["t"], y=chart_df["x"], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"),
+                    go.Scatter(x=[row["t"]], y=[row["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
                 ],
             )
         )
@@ -372,13 +482,10 @@ def build_animation_with_dark_graphs(
     fig.add_shape(type="rect", x0=scene_x_min, x1=scene_x_max, y0=0, y1=scene_y_top, fillcolor="#EAF7FF", line=dict(width=0), layer="below", row=1, col=1)
     fig.add_shape(type="rect", x0=scene_x_min, x1=scene_x_max, y0=scene_y_min, y1=0, fillcolor="#7CB342", line=dict(width=0), layer="below", row=1, col=1)
     fig.add_shape(type="line", x0=scene_x_min, x1=scene_x_max, y0=0, y1=0, line=dict(width=5, color="#33691E"), layer="above", row=1, col=1)
-    fig.add_shape(type="rect", x0=0, x1=1, y0=0, y1=1, fillcolor="#FFFFFF", line=dict(width=2, color="#CBD5E1"), layer="below", row=1, col=2)
+    fig.add_shape(type="rect", x0=0, x1=1, y0=0, y1=1, fillcolor="#FFFFFF", line=dict(width=2, color="#CBD5E1"), layer="below", row=1, col=3)
     fig.add_annotation(x=(scene_x_min + scene_x_max) / 2, y=scene_y_min * 0.55, text="<b>SOLO</b>", showarrow=False, font=dict(size=15, color="#1B5E20"), row=1, col=1)
 
-    for subplot_ref in [
-        ("x3 domain", "y3 domain"),
-        ("x4 domain", "y4 domain"),
-    ]:
+    for subplot_ref in [("x3 domain", "y3 domain"), ("x4 domain", "y4 domain"), ("x5 domain", "y5 domain")]:
         fig.add_shape(
             type="rect",
             xref=subplot_ref[0],
@@ -393,14 +500,14 @@ def build_animation_with_dark_graphs(
         )
 
     fig.update_layout(
-        height=880,
-        margin=dict(l=20, r=20, t=70, b=55),
+        height=900,
+        margin=dict(l=20, r=20, t=72, b=58),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0, font=dict(color=DARK_TEXT)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0, font=dict(color="#111827")),
         dragmode=False,
-        plot_bgcolor=DARK_BG,
-        paper_bgcolor=DARK_BG,
-        font=dict(color=DARK_TEXT),
+        plot_bgcolor="#FFFFFF",
+        paper_bgcolor="#FFFFFF",
+        font=dict(color="#111827"),
         updatemenus=[
             {
                 "type": "buttons",
@@ -448,7 +555,7 @@ def build_animation_with_dark_graphs(
                 "bgcolor": "#E5E7EB",
                 "activebgcolor": "#1D4ED8",
                 "bordercolor": "#CBD5E1",
-                "currentvalue": {"prefix": "Tempo: ", "suffix": "", "font": {"size": 14, "color": DARK_TEXT}},
+                "currentvalue": {"prefix": "Tempo: ", "suffix": "", "font": {"size": 14, "color": "#111827"}},
                 "steps": slider_steps,
             }
         ],
@@ -456,21 +563,38 @@ def build_animation_with_dark_graphs(
 
     fig.update_xaxes(range=[scene_x_min, scene_x_max], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=1)
     fig.update_yaxes(range=[scene_y_min, scene_y_top], showgrid=False, zeroline=False, title="Altura (m)", fixedrange=True, row=1, col=1)
-    fig.update_xaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=2)
-    fig.update_yaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=2)
-    fig.update_xaxes(range=[0, time_max * 1.02], title="Tempo (s)", gridcolor=DARK_GRID, zerolinecolor=DARK_GRID, fixedrange=True, row=2, col=1)
-    fig.update_yaxes(range=[velocity_min - velocity_margin, velocity_max + velocity_margin], title="Velocidade (m/s)", gridcolor=DARK_GRID, zerolinecolor=DARK_GRID, fixedrange=True, row=2, col=1)
-    fig.update_xaxes(range=[0, time_max * 1.02], title="Tempo (s)", gridcolor=DARK_GRID, zerolinecolor=DARK_GRID, fixedrange=True, row=2, col=2)
-    fig.update_yaxes(range=[accel_min - accel_margin, accel_max + accel_margin], title="Aceleração vertical (m/s²)", gridcolor=DARK_GRID, zerolinecolor=DARK_GRID, fixedrange=True, row=2, col=2)
+    fig.update_xaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=3)
+    fig.update_yaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=3)
+
+    style_dark_axes(fig, row=2, col=1, x_title="Tempo (s)", y_title="Velocidade (m/s)")
+    style_dark_axes(fig, row=2, col=2, x_title="Tempo (s)", y_title="Altura (m)")
+    style_dark_axes(fig, row=2, col=3, x_title="Tempo (s)", y_title="Distância horizontal (m)")
+
+    fig.update_xaxes(range=[0, time_max * 1.02], row=2, col=1)
+    fig.update_yaxes(range=[velocity_min - velocity_margin, velocity_max + velocity_margin], row=2, col=1)
+    fig.update_xaxes(range=[0, time_max * 1.02], row=2, col=2)
+    fig.update_yaxes(range=[0, height_max * 1.08], row=2, col=2)
+    fig.update_xaxes(range=[0, time_max * 1.02], row=2, col=3)
+    fig.update_yaxes(range=[distance_min - distance_margin, distance_max + distance_margin], row=2, col=3)
 
     return fig
 
 
-st.title("Simulador de Queda Livre")
-st.caption("Versão didática: movimento vertical sob ação exclusiva da gravidade.")
+st.markdown(
+    """
+    <div class="hero-card">
+        <div class="hero-title">Simulador didático de queda livre</div>
+        <div class="hero-subtitle">
+            Visualize o corpo em queda, os vetores de velocidade e a construção simultânea dos gráficos de velocidade,
+            altura e distância horizontal. A simulação considera o modelo ideal, sem resistência do ar e sem vento.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 with st.sidebar:
-    st.header("Configuração da queda")
+    st.header("⚙️ Configuração da queda")
 
     preset_name = st.selectbox(
         "Objeto visual",
@@ -486,8 +610,7 @@ with st.sidebar:
         preset = OBJECT_PRESETS[preset_name]
         falling_object = make_custom_object(name=preset.name, mass=1.0, area=1.0, drag_coefficient=0.0)
 
-    st.header("Condições iniciais")
-
+    st.header("📌 Condições iniciais")
     initial_height = st.number_input("Altura inicial (m)", min_value=0.1, value=100.0, step=10.0)
     initial_vx = st.number_input(
         "Velocidade horizontal inicial (m/s)",
@@ -498,7 +621,7 @@ with st.sidebar:
     initial_vy = st.number_input("Velocidade vertical inicial (m/s)", value=0.0, step=1.0, help="Valor positivo para cima e negativo para baixo.")
     gravity = st.number_input("Aceleração da gravidade g (m/s²)", min_value=0.0, value=9.81, step=0.01)
 
-    st.header("Precisão numérica")
+    st.header("🧮 Precisão numérica")
     dt = st.number_input("Passo de tempo dt (s)", min_value=0.001, max_value=1.0, value=0.01, step=0.001, format="%.3f")
     max_time = st.number_input("Tempo máximo de simulação (s)", min_value=1.0, value=300.0, step=10.0)
 
@@ -533,28 +656,40 @@ metric_cols[0].metric("Tempo de queda", f"{impact['t']:.2f} s")
 metric_cols[1].metric("Velocidade final", f"{impact['speed']:.2f} m/s")
 metric_cols[2].metric("vₓ final", f"{impact['vx']:.2f} m/s")
 metric_cols[3].metric("vᵧ final", f"{impact['vy']:.2f} m/s")
-metric_cols[4].metric("Gravidade", f"{gravity:.2f} m/s²")
+metric_cols[4].metric("Distância final", f"{impact['x']:.2f} m")
 
-st.info(
-    "Voltei a visualização para o estilo anterior: cena grande com painel lateral. "
-    "Os gráficos escuros abaixo da cena agora são construídos simultaneamente com a animação."
-)
-
-st.divider()
-st.subheader("Animação com gráficos escuros sincronizados")
-st.caption(
-    "A cena da queda fica no topo. Embaixo, os gráficos escuros de componentes da velocidade e aceleração vertical "
-    "são desenhados junto com o movimento."
+st.markdown(
+    """
+    <div class="section-card">
+        <div class="section-title">Animação com gráficos sincronizados</div>
+        <div class="section-subtitle">
+            A cena da queda aparece no topo. Abaixo dela, os gráficos escuros de componentes da velocidade,
+            altura e distância horizontal são desenhados ao mesmo tempo que o corpo se movimenta.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 animation_fig = build_animation_with_dark_graphs(full_df=df, object_name=falling_object.name, gravity=gravity)
 st.plotly_chart(animation_fig, use_container_width=True, config=ANIMATION_PLOTLY_CONFIG)
 
-st.divider()
-left, right = st.columns(2)
+st.markdown(
+    """
+    <div class="section-card">
+        <div class="section-title">Gráficos completos</div>
+        <div class="section-subtitle">
+            Estes gráficos mostram o resultado final completo da simulação, sem depender da animação.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+left, middle, right = st.columns(3)
 
 with left:
-    st.subheader("Componentes da velocidade × tempo — gráfico completo")
+    st.subheader("Componentes da velocidade × tempo")
     velocity_df = df[["t", "speed", "vx", "vy"]].rename(
         columns={"speed": "|v| velocidade resultante", "vx": "vₓ componente horizontal", "vy": "vᵧ componente vertical"}
     )
@@ -567,10 +702,17 @@ with left:
     )
     st.plotly_chart(fig_speed, use_container_width=True)
 
+with middle:
+    st.subheader("Altura × tempo")
+    fig_height = px.line(df, x="t", y="y", labels={"t": "Tempo (s)", "y": "Altura (m)"}, template="plotly_dark")
+    fig_height.update_traces(line=dict(color=HEIGHT_COLOR, width=4))
+    st.plotly_chart(fig_height, use_container_width=True)
+
 with right:
-    st.subheader("Aceleração vertical × tempo — gráfico completo")
-    fig_ay = px.line(df, x="t", y="ay", labels={"t": "Tempo (s)", "ay": "Aceleração vertical (m/s²)"}, template="plotly_dark")
-    st.plotly_chart(fig_ay, use_container_width=True)
+    st.subheader("Distância horizontal × tempo")
+    fig_distance = px.line(df, x="t", y="x", labels={"t": "Tempo (s)", "x": "Distância horizontal (m)"}, template="plotly_dark")
+    fig_distance.update_traces(line=dict(color=DISTANCE_COLOR, width=4))
+    st.plotly_chart(fig_distance, use_container_width=True)
 
 with st.expander("Ver tabela da simulação"):
     st.dataframe(df, use_container_width=True)
@@ -583,7 +725,7 @@ with st.expander("Interpretação física"):
         - A velocidade resultante é formada pelas componentes horizontal e vertical.
         - A componente horizontal `vₓ` permanece constante quando não há resistência do ar.
         - A componente vertical `vᵧ` muda continuamente por causa da aceleração da gravidade.
-        - O gráfico das velocidades mostra `|v|`, `vₓ` e `vᵧ` sendo construídos no mesmo instante da animação.
-        - O gráfico da aceleração vertical mostra que, na queda livre ideal, a aceleração permanece constante.
+        - O gráfico da altura mostra como a posição vertical diminui durante a queda.
+        - O gráfico da distância horizontal mostra o deslocamento lateral quando existe velocidade horizontal inicial.
         """
     )
