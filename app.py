@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
 
 from atmosphere import AtmosphereConfig
 from objects import OBJECT_PRESETS, make_custom_object
@@ -35,6 +36,8 @@ ANIMATION_PLOTLY_CONFIG = {
 VECTOR_RESULTANT_COLOR = "#7E22CE"
 VECTOR_X_COLOR = "#2563EB"
 VECTOR_Y_COLOR = "#DC2626"
+HEIGHT_COLOR = "#0891B2"
+OBJECT_COLOR = "#FF7043"
 
 
 st.set_page_config(
@@ -65,10 +68,11 @@ def format_panel_text(row: pd.Series, object_name: str, gravity: float) -> str:
         f"<span style='color:{VECTOR_Y_COLOR}'><b>vᵧ:</b></span> {row['vy']:.2f} m/s<br>"
         f"➡ <b>Distância horizontal:</b> {row['x']:.2f} m<br>"
         f"⬇ <b>Aceleração:</b> {gravity:.2f} m/s²<br>"
-        f"<br><b>Vetores:</b><br>"
+        f"<br><b>Leitura dos vetores:</b><br>"
         f"<span style='color:{VECTOR_RESULTANT_COLOR}'><b>roxo:</b></span> velocidade resultante<br>"
         f"<span style='color:{VECTOR_X_COLOR}'><b>azul:</b></span> componente horizontal<br>"
-        f"<span style='color:{VECTOR_Y_COLOR}'><b>vermelho:</b></span> componente vertical"
+        f"<span style='color:{VECTOR_Y_COLOR}'><b>vermelho:</b></span> componente vertical<br>"
+        f"<br><b>Gráficos:</b> são desenhados junto com a queda."
     )
 
 
@@ -110,9 +114,6 @@ def vector_geometry(
     vx_end = (x + vx * vector_scale, y)
     vy_end = (x, y + vy * vector_scale)
 
-    label_dx = 0.025 * scene_width
-    label_dy = 0.035 * scene_y_max
-
     resultant_width = 2 + 4 * (speed / max_speed if max_speed > 0 else 0)
     vx_width = 2 + 3 * (abs(vx) / max_abs_vx if max_abs_vx > 0 else 0)
     vy_width = 2 + 3 * (abs(vy) / max_abs_vy if max_abs_vy > 0 else 0)
@@ -122,9 +123,6 @@ def vector_geometry(
         "v_end": v_end,
         "vx_end": vx_end,
         "vy_end": vy_end,
-        "v_label": (v_end[0] + label_dx, v_end[1] + label_dy),
-        "vx_label": (vx_end[0] + label_dx, vx_end[1] + label_dy),
-        "vy_label": (vy_end[0] + label_dx, vy_end[1]),
         "resultant_width": resultant_width,
         "vx_width": vx_width,
         "vy_width": vy_width,
@@ -133,18 +131,12 @@ def vector_geometry(
     }
 
 
-def build_vector_traces(
-    row: pd.Series,
-    vector_data: dict[str, object],
-) -> list[go.Scatter]:
+def build_vector_traces(row: pd.Series, vector_data: dict[str, object]) -> list[go.Scatter]:
     """Cria os traços dos vetores para a animação."""
     x, y = vector_data["origin"]
     vx_end = vector_data["vx_end"]
     vy_end = vector_data["vy_end"]
     v_end = vector_data["v_end"]
-    vx_label = vector_data["vx_label"]
-    vy_label = vector_data["vy_label"]
-    v_label = vector_data["v_label"]
 
     return [
         go.Scatter(
@@ -160,7 +152,7 @@ def build_vector_traces(
             mode="markers+text",
             text=["v"],
             textposition="top center",
-            textfont=dict(size=16, color=VECTOR_RESULTANT_COLOR),
+            textfont=dict(size=15, color=VECTOR_RESULTANT_COLOR),
             marker=dict(size=14, color=VECTOR_RESULTANT_COLOR, symbol="diamond"),
             hovertemplate=f"|v| = {row['speed']:.2f} m/s<extra></extra>",
         ),
@@ -177,7 +169,7 @@ def build_vector_traces(
             mode="markers+text",
             text=["vₓ"],
             textposition="top center",
-            textfont=dict(size=16, color=VECTOR_X_COLOR),
+            textfont=dict(size=15, color=VECTOR_X_COLOR),
             marker=dict(
                 size=14,
                 color=VECTOR_X_COLOR,
@@ -198,7 +190,7 @@ def build_vector_traces(
             mode="markers+text",
             text=["vᵧ"],
             textposition="middle right",
-            textfont=dict(size=16, color=VECTOR_Y_COLOR),
+            textfont=dict(size=15, color=VECTOR_Y_COLOR),
             marker=dict(
                 size=14,
                 color=VECTOR_Y_COLOR,
@@ -209,15 +201,16 @@ def build_vector_traces(
     ]
 
 
-def build_visual_animation_figure(
+def build_synchronized_animation_figure(
     full_df: pd.DataFrame,
     object_name: str,
     gravity: float,
 ) -> go.Figure:
-    """Cria uma animação visual 2D usando frames nativos do Plotly."""
+    """Cria uma animação única com cena, vetores e gráficos sincronizados."""
     anim_df = sample_simulation_frames(full_df, max_frames=120)
 
     scene_y_max = max(float(anim_df["y"].max()), 1.0)
+    scene_y_min = min(float(anim_df["y"].min()), 0.0)
     ground_bottom = -0.10 * scene_y_max
 
     scene_x_min = float(anim_df["x"].min())
@@ -233,29 +226,184 @@ def build_visual_animation_figure(
         scene_x_max += margin
 
     scene_width = scene_x_max - scene_x_min
-    panel_gap = 0.08 * scene_width
-    panel_width = 0.65 * scene_width
-    panel_x_min = scene_x_max + panel_gap
-    panel_x_max = panel_x_min + panel_width
-    panel_x_text = panel_x_min + 0.08 * panel_width
-    panel_y_text = 0.55 * scene_y_max
-
     max_speed = max(float(anim_df["speed"].max()), 1e-9)
     max_abs_vx = max(float(anim_df["vx"].abs().max()), 1e-9)
     max_abs_vy = max(float(anim_df["vy"].abs().max()), 1e-9)
     vector_reference_length = max(0.12 * scene_y_max, min(0.24 * scene_y_max, 0.20 * scene_width))
     vector_scale = vector_reference_length / max_speed
 
+    scene_x_min -= 1.15 * vector_reference_length
+    scene_x_max += 1.15 * vector_reference_length
+    scene_y_min = min(ground_bottom - 0.60 * vector_reference_length, scene_y_min)
+    scene_y_top = scene_y_max * 1.12 + 0.25 * vector_reference_length
+
+    time_max = max(float(anim_df["t"].max()), 1e-9)
+    height_max = max(float(anim_df["y"].max()), 1.0)
+    velocity_min = min(float(anim_df["vy"].min()), float(anim_df["vx"].min()), 0.0)
+    velocity_max = max(float(anim_df["speed"].max()), float(anim_df["vx"].max()), float(anim_df["vy"].max()), 1.0)
+    velocity_margin = max(1.0, 0.10 * (velocity_max - velocity_min))
+
     initial = anim_df.iloc[0]
-    initial_text = format_panel_text(initial, object_name, gravity)
     initial_vector_data = vector_geometry(
         row=initial,
         vector_scale=vector_scale,
-        scene_width=scene_width,
+        scene_width=scene_x_max - scene_x_min,
         scene_y_max=scene_y_max,
         max_speed=max_speed,
         max_abs_vx=max_abs_vx,
         max_abs_vy=max_abs_vy,
+    )
+
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        row_heights=[0.62, 0.38],
+        column_widths=[0.66, 0.34],
+        horizontal_spacing=0.07,
+        vertical_spacing=0.15,
+        subplot_titles=(
+            "Cena da queda com vetores",
+            "Painel da queda",
+            "Altura × tempo",
+            "Componentes da velocidade × tempo",
+        ),
+    )
+
+    # 0 - Rastro da trajetória
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["x"]],
+            y=[initial["y"]],
+            mode="lines",
+            line=dict(width=4, color="#0D47A1"),
+            name="Rastro",
+            hoverinfo="skip",
+        ),
+        row=1,
+        col=1,
+    )
+
+    # 1 - Objeto
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["x"]],
+            y=[initial["y"]],
+            mode="markers",
+            name="Objeto",
+            marker=dict(size=34, color=OBJECT_COLOR, line=dict(width=3, color="#BF360C")),
+            hovertemplate=(
+                "Tempo: %{customdata[0]:.2f} s<br>"
+                "Altura: %{y:.2f} m<br>"
+                "Velocidade: %{customdata[1]:.2f} m/s<extra></extra>"
+            ),
+            customdata=[[initial["t"], initial["speed"]]],
+        ),
+        row=1,
+        col=1,
+    )
+
+    # 2 a 7 - Vetores da velocidade
+    for trace in build_vector_traces(initial, initial_vector_data):
+        fig.add_trace(trace, row=1, col=1)
+
+    # 8 - Painel lateral
+    fig.add_trace(
+        go.Scatter(
+            x=[0.05],
+            y=[0.52],
+            mode="text",
+            name="Painel",
+            text=[format_panel_text(initial, object_name, gravity)],
+            textposition="middle left",
+            textfont=dict(size=15, color="#1F2937"),
+            hoverinfo="skip",
+        ),
+        row=1,
+        col=2,
+    )
+
+    # 9 - Gráfico altura × tempo sendo construído
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"]],
+            y=[initial["y"]],
+            mode="lines",
+            line=dict(width=4, color=HEIGHT_COLOR),
+            name="Altura",
+            hovertemplate="t = %{x:.2f} s<br>y = %{y:.2f} m<extra></extra>",
+        ),
+        row=2,
+        col=1,
+    )
+
+    # 10 - Marcador atual no gráfico altura × tempo
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"]],
+            y=[initial["y"]],
+            mode="markers",
+            marker=dict(size=12, color=OBJECT_COLOR, line=dict(width=2, color="#BF360C")),
+            name="Altura atual",
+            hoverinfo="skip",
+        ),
+        row=2,
+        col=1,
+    )
+
+    # 11, 12, 13 - Componentes da velocidade sendo construídas
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"]],
+            y=[initial["speed"]],
+            mode="lines",
+            line=dict(width=4, color=VECTOR_RESULTANT_COLOR),
+            name="|v|",
+            hovertemplate="t = %{x:.2f} s<br>|v| = %{y:.2f} m/s<extra></extra>",
+        ),
+        row=2,
+        col=2,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"]],
+            y=[initial["vx"]],
+            mode="lines",
+            line=dict(width=3, color=VECTOR_X_COLOR),
+            name="vₓ",
+            hovertemplate="t = %{x:.2f} s<br>vₓ = %{y:.2f} m/s<extra></extra>",
+        ),
+        row=2,
+        col=2,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"]],
+            y=[initial["vy"]],
+            mode="lines",
+            line=dict(width=3, color=VECTOR_Y_COLOR),
+            name="vᵧ",
+            hovertemplate="t = %{x:.2f} s<br>vᵧ = %{y:.2f} m/s<extra></extra>",
+        ),
+        row=2,
+        col=2,
+    )
+
+    # 14 - Marcadores atuais das velocidades
+    fig.add_trace(
+        go.Scatter(
+            x=[initial["t"], initial["t"], initial["t"]],
+            y=[initial["speed"], initial["vx"], initial["vy"]],
+            mode="markers",
+            marker=dict(
+                size=10,
+                color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR],
+                line=dict(width=1, color="#111827"),
+            ),
+            name="Velocidade atual",
+            hoverinfo="skip",
+        ),
+        row=2,
+        col=2,
     )
 
     frames: list[go.Frame] = []
@@ -267,33 +415,24 @@ def build_visual_animation_figure(
         vector_data = vector_geometry(
             row=row,
             vector_scale=vector_scale,
-            scene_width=scene_width,
+            scene_width=scene_x_max - scene_x_min,
             scene_y_max=scene_y_max,
             max_speed=max_speed,
             max_abs_vx=max_abs_vx,
             max_abs_vy=max_abs_vy,
         )
+        chart_df = anim_df.iloc[: index + 1]
 
         frames.append(
             go.Frame(
                 name=frame_name,
                 data=[
-                    go.Scatter(
-                        x=trail_df["x"],
-                        y=trail_df["y"],
-                        mode="lines",
-                        line=dict(width=4, color="#0D47A1"),
-                        hoverinfo="skip",
-                    ),
+                    go.Scatter(x=trail_df["x"], y=trail_df["y"], mode="lines", line=dict(width=4, color="#0D47A1"), hoverinfo="skip"),
                     go.Scatter(
                         x=[row["x"]],
                         y=[row["y"]],
                         mode="markers",
-                        marker=dict(
-                            size=34,
-                            color="#FF7043",
-                            line=dict(width=3, color="#BF360C"),
-                        ),
+                        marker=dict(size=34, color=OBJECT_COLOR, line=dict(width=3, color="#BF360C")),
                         hovertemplate=(
                             "Tempo: %{customdata[0]:.2f} s<br>"
                             "Altura: %{y:.2f} m<br>"
@@ -303,13 +442,28 @@ def build_visual_animation_figure(
                     ),
                     *build_vector_traces(row, vector_data),
                     go.Scatter(
-                        x=[panel_x_text],
-                        y=[panel_y_text],
+                        x=[0.05],
+                        y=[0.52],
                         mode="text",
                         text=[format_panel_text(row, object_name, gravity)],
                         textposition="middle left",
-                        textfont=dict(size=16, color="#1F2937"),
+                        textfont=dict(size=15, color="#1F2937"),
                         hoverinfo="skip",
+                    ),
+                    go.Scatter(x=chart_df["t"], y=chart_df["y"], mode="lines", line=dict(width=4, color=HEIGHT_COLOR)),
+                    go.Scatter(x=[row["t"]], y=[row["y"]], mode="markers", marker=dict(size=12, color=OBJECT_COLOR, line=dict(width=2, color="#BF360C"))),
+                    go.Scatter(x=chart_df["t"], y=chart_df["speed"], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR)),
+                    go.Scatter(x=chart_df["t"], y=chart_df["vx"], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR)),
+                    go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR)),
+                    go.Scatter(
+                        x=[row["t"], row["t"], row["t"]],
+                        y=[row["speed"], row["vx"], row["vy"]],
+                        mode="markers",
+                        marker=dict(
+                            size=10,
+                            color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR],
+                            line=dict(width=1, color="#111827"),
+                        ),
                     ),
                 ],
             )
@@ -331,133 +485,61 @@ def build_visual_animation_figure(
                 }
             )
 
-    fig = go.Figure(
-        data=[
-            go.Scatter(
-                x=[initial["x"]],
-                y=[initial["y"]],
-                mode="lines",
-                line=dict(width=4, color="#0D47A1"),
-                name="Rastro",
-                hoverinfo="skip",
-            ),
-            go.Scatter(
-                x=[initial["x"]],
-                y=[initial["y"]],
-                mode="markers",
-                name="Objeto",
-                marker=dict(
-                    size=34,
-                    color="#FF7043",
-                    line=dict(width=3, color="#BF360C"),
-                ),
-                hovertemplate=(
-                    "Tempo: %{customdata[0]:.2f} s<br>"
-                    "Altura: %{y:.2f} m<br>"
-                    "Velocidade: %{customdata[1]:.2f} m/s<extra></extra>"
-                ),
-                customdata=[[initial["t"], initial["speed"]]],
-            ),
-            *build_vector_traces(initial, initial_vector_data),
-            go.Scatter(
-                x=[panel_x_text],
-                y=[panel_y_text],
-                mode="text",
-                name="Painel",
-                text=[initial_text],
-                textposition="middle left",
-                textfont=dict(size=16, color="#1F2937"),
-                hoverinfo="skip",
-            ),
-        ],
-        frames=frames,
+    fig.frames = frames
+
+    fig.add_shape(
+        type="rect",
+        x0=scene_x_min,
+        x1=scene_x_max,
+        y0=0,
+        y1=scene_y_top,
+        fillcolor="#EAF7FF",
+        line=dict(width=0),
+        layer="below",
+        row=1,
+        col=1,
+    )
+    fig.add_shape(
+        type="rect",
+        x0=scene_x_min,
+        x1=scene_x_max,
+        y0=scene_y_min,
+        y1=0,
+        fillcolor="#7CB342",
+        line=dict(width=0),
+        layer="below",
+        row=1,
+        col=1,
+    )
+    fig.add_shape(
+        type="line",
+        x0=scene_x_min,
+        x1=scene_x_max,
+        y0=0,
+        y1=0,
+        line=dict(width=5, color="#33691E"),
+        layer="above",
+        row=1,
+        col=1,
+    )
+    fig.add_annotation(
+        x=(scene_x_min + scene_x_max) / 2,
+        y=scene_y_min * 0.55,
+        text="<b>SOLO</b>",
+        showarrow=False,
+        font=dict(size=15, color="#1B5E20"),
+        row=1,
+        col=1,
     )
 
     fig.update_layout(
-        height=600,
-        margin=dict(l=20, r=20, t=60, b=40),
-        title=dict(
-            text="Animação visual da queda livre com vetores",
-            x=0.02,
-            xanchor="left",
-        ),
-        showlegend=False,
+        height=840,
+        margin=dict(l=20, r=20, t=70, b=50),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
         dragmode=False,
-        xaxis=dict(
-            range=[scene_x_min, panel_x_max],
-            showgrid=False,
-            zeroline=False,
-            title="",
-            showticklabels=False,
-            fixedrange=True,
-        ),
-        yaxis=dict(
-            range=[ground_bottom, scene_y_max * 1.08],
-            showgrid=False,
-            zeroline=False,
-            title="Altura (m)",
-            fixedrange=True,
-        ),
-        plot_bgcolor="#EAF7FF",
+        plot_bgcolor="white",
         paper_bgcolor="white",
-        shapes=[
-            dict(
-                type="rect",
-                x0=scene_x_min,
-                x1=scene_x_max,
-                y0=0,
-                y1=scene_y_max * 1.08,
-                fillcolor="#EAF7FF",
-                line=dict(width=0),
-                layer="below",
-            ),
-            dict(
-                type="rect",
-                x0=scene_x_min,
-                x1=scene_x_max,
-                y0=ground_bottom,
-                y1=0,
-                fillcolor="#7CB342",
-                line=dict(width=0),
-                layer="below",
-            ),
-            dict(
-                type="line",
-                x0=scene_x_min,
-                x1=scene_x_max,
-                y0=0,
-                y1=0,
-                line=dict(width=5, color="#33691E"),
-                layer="above",
-            ),
-            dict(
-                type="rect",
-                x0=panel_x_min,
-                x1=panel_x_max,
-                y0=ground_bottom,
-                y1=scene_y_max * 1.08,
-                fillcolor="#FFFFFF",
-                line=dict(width=2, color="#CBD5E1"),
-                layer="below",
-            ),
-        ],
-        annotations=[
-            dict(
-                x=(panel_x_min + panel_x_max) / 2,
-                y=scene_y_max * 0.96,
-                text="<b>Painel da queda</b>",
-                showarrow=False,
-                font=dict(size=20, color="#111827"),
-                align="center",
-            ),
-            dict(
-                x=(scene_x_min + scene_x_max) / 2,
-                y=ground_bottom * 0.48,
-                text="<b>SOLO</b>",
-                showarrow=False,
-                font=dict(size=16, color="#1B5E20"),
-            ),
-        ],
         updatemenus=[
             {
                 "type": "buttons",
@@ -478,10 +560,7 @@ def build_visual_animation_figure(
                         "args": [
                             None,
                             {
-                                "frame": {
-                                    "duration": ANIMATION_FRAME_DURATION_MS,
-                                    "redraw": True,
-                                },
+                                "frame": {"duration": ANIMATION_FRAME_DURATION_MS, "redraw": True},
                                 "fromcurrent": True,
                                 "transition": {"duration": 0},
                                 "mode": "immediate",
@@ -515,15 +594,20 @@ def build_visual_animation_figure(
                 "bgcolor": "#E5E7EB",
                 "activebgcolor": "#1D4ED8",
                 "bordercolor": "#CBD5E1",
-                "currentvalue": {
-                    "prefix": "Tempo: ",
-                    "suffix": "",
-                    "font": {"size": 14, "color": "#111827"},
-                },
+                "currentvalue": {"prefix": "Tempo: ", "suffix": "", "font": {"size": 14, "color": "#111827"}},
                 "steps": slider_steps,
             }
         ],
     )
+
+    fig.update_xaxes(range=[scene_x_min, scene_x_max], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=1)
+    fig.update_yaxes(range=[scene_y_min, scene_y_top], showgrid=False, zeroline=False, title="Altura (m)", fixedrange=True, row=1, col=1)
+    fig.update_xaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=2)
+    fig.update_yaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=2)
+    fig.update_xaxes(range=[0, time_max * 1.02], title="Tempo (s)", fixedrange=True, row=2, col=1)
+    fig.update_yaxes(range=[0, height_max * 1.08], title="Altura (m)", fixedrange=True, row=2, col=1)
+    fig.update_xaxes(range=[0, time_max * 1.02], title="Tempo (s)", fixedrange=True, row=2, col=2)
+    fig.update_yaxes(range=[velocity_min - velocity_margin, velocity_max + velocity_margin], title="Velocidade (m/s)", fixedrange=True, row=2, col=2)
 
     return fig
 
@@ -647,17 +731,17 @@ metric_cols[4].metric("Gravidade", f"{gravity:.2f} m/s²")
 st.info(
     "Nesta versão didática, a resistência do ar e o vento foram removidos. "
     "O movimento é calculado considerando apenas a ação da gravidade. "
-    "Os vetores mostram a velocidade resultante e suas componentes horizontal e vertical."
+    "Agora os gráficos são desenhados junto com a animação."
 )
 
 st.divider()
-st.subheader("Animação visual 2D com vetores")
+st.subheader("Animação sincronizada com gráficos")
 st.caption(
-    "O vetor roxo representa a velocidade resultante; o azul mostra vₓ; "
-    "o vermelho mostra vᵧ. O tamanho e a espessura variam durante a queda."
+    "A queda, os vetores, o gráfico altura × tempo e o gráfico das componentes da velocidade "
+    "são construídos ao mesmo tempo. Use o Play do gráfico para visualizar a evolução."
 )
 
-animation_fig = build_visual_animation_figure(
+animation_fig = build_synchronized_animation_figure(
     full_df=df,
     object_name=falling_object.name,
     gravity=gravity,
@@ -672,11 +756,11 @@ st.divider()
 left, right = st.columns(2)
 
 with left:
-    st.subheader("Altura × tempo")
+    st.subheader("Altura × tempo — gráfico completo")
     fig_y = px.line(df, x="t", y="y", labels={"t": "Tempo (s)", "y": "Altura (m)"})
     st.plotly_chart(fig_y, use_container_width=True)
 
-    st.subheader("Componentes da velocidade × tempo")
+    st.subheader("Componentes da velocidade × tempo — gráfico completo")
     velocity_df = df[["t", "speed", "vx", "vy"]].rename(
         columns={
             "speed": "|v| velocidade resultante",
@@ -693,12 +777,12 @@ with left:
     st.plotly_chart(fig_speed, use_container_width=True)
 
 with right:
-    st.subheader("Trajetória")
+    st.subheader("Trajetória — gráfico completo")
     fig_traj = px.line(df, x="x", y="y", labels={"x": "Posição horizontal (m)", "y": "Altura (m)"})
     fig_traj.update_yaxes(scaleanchor="x", scaleratio=1)
     st.plotly_chart(fig_traj, use_container_width=True)
 
-    st.subheader("Aceleração vertical × tempo")
+    st.subheader("Aceleração vertical × tempo — gráfico completo")
     fig_ay = px.line(df, x="t", y="ay", labels={"t": "Tempo (s)", "ay": "Aceleração vertical (m/s²)"})
     st.plotly_chart(fig_ay, use_container_width=True)
 
@@ -719,7 +803,8 @@ with st.expander("Interpretação física"):
         - A velocidade resultante é formada pelas componentes horizontal e vertical.
         - A componente horizontal `vₓ` permanece constante quando não há resistência do ar.
         - A componente vertical `vᵧ` muda continuamente por causa da aceleração da gravidade.
-        - O vetor resultante muda de tamanho, direção e sentido conforme `vₓ` e `vᵧ` se combinam.
+        - O gráfico altura × tempo é desenhado junto com a queda, mostrando a diminuição da altura.
+        - O gráfico das velocidades mostra `|v|`, `vₓ` e `vᵧ` sendo construídos no mesmo instante da animação.
         - Se `vₓ = 0`, o movimento é uma queda vertical pura; se `vₓ ≠ 0`, o movimento se torna bidimensional.
         """
     )
