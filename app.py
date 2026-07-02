@@ -354,6 +354,33 @@ def style_axes(fig: go.Figure, row: int, col: int, x_title: str, y_title: str, t
     )
 
 
+def add_local_graph_legends(fig: go.Figure, theme: dict[str, str]) -> None:
+    """Adiciona legendas locais dentro de cada gráfico sincronizado."""
+    velocity_legend = (
+        f"<span style='color:{VECTOR_RESULTANT_COLOR}'><b>■</b></span> |v| &nbsp;&nbsp;"
+        f"<span style='color:{VECTOR_X_COLOR}'><b>■</b></span> vₓ &nbsp;&nbsp;"
+        f"<span style='color:{VECTOR_Y_COLOR}'><b>■</b></span> vᵧ"
+    )
+    height_legend = f"<span style='color:{HEIGHT_COLOR}'><b>■</b></span> altura"
+    distance_legend = f"<span style='color:{DISTANCE_COLOR}'><b>■</b></span> distância horizontal"
+
+    for annotation in [
+        dict(xref="x3 domain", yref="y3 domain", x=0.03, y=0.96, text=velocity_legend),
+        dict(xref="x4 domain", yref="y4 domain", x=0.03, y=0.96, text=height_legend),
+        dict(xref="x5 domain", yref="y5 domain", x=0.03, y=0.96, text=distance_legend),
+    ]:
+        fig.add_annotation(
+            **annotation,
+            showarrow=False,
+            align="left",
+            xanchor="left",
+            yanchor="top",
+            bgcolor="rgba(0,0,0,0)",
+            borderpad=2,
+            font=dict(size=12, color=theme["text"]),
+        )
+
+
 def build_animation_with_graphs(
     full_df: pd.DataFrame,
     object_name: str,
@@ -424,13 +451,12 @@ def build_animation_with_graphs(
         ),
     )
 
-    fig.add_trace(go.Scatter(x=[initial["x"]], y=[initial["y"]], mode="lines", line=dict(width=4, color="#0D47A1"), name="Rastro", hoverinfo="skip", showlegend=False), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[initial["x"]], y=[initial["y"]], mode="lines", line=dict(width=4, color="#0D47A1"), hoverinfo="skip", showlegend=False), row=1, col=1)
     fig.add_trace(
         go.Scatter(
             x=[initial["x"]],
             y=[initial["y"]],
             mode="markers",
-            name="Objeto",
             marker=dict(size=34, color=OBJECT_COLOR, line=dict(width=3, color="#BF360C")),
             hovertemplate="Tempo: %{customdata[0]:.2f} s<br>Altura: %{y:.2f} m<br>Velocidade: %{customdata[1]:.2f} m/s<extra></extra>",
             customdata=[[initial["t"], initial["speed"]]],
@@ -458,16 +484,15 @@ def build_animation_with_graphs(
         col=3,
     )
 
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["speed"]], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), name="|v| velocidade resultante"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vx"]], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), name="vₓ componente horizontal"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vy"]], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), name="vᵧ componente vertical"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["speed"]], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), showlegend=False), row=2, col=1)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vx"]], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), showlegend=False), row=2, col=1)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vy"]], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), showlegend=False), row=2, col=1)
     fig.add_trace(
         go.Scatter(
             x=[initial["t"], initial["t"], initial["t"]],
             y=[initial["speed"], initial["vx"], initial["vy"]],
             mode="markers",
             marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR], line=dict(width=1, color=theme["text"])),
-            name="valores atuais",
             hoverinfo="skip",
             showlegend=False,
         ),
@@ -475,11 +500,11 @@ def build_animation_with_graphs(
         col=1,
     )
 
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"), row=2, col=2)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color=theme["text"])), name="altura atual", hoverinfo="skip", showlegend=False), row=2, col=2)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), showlegend=False), row=2, col=2)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False), row=2, col=2)
 
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"), row=2, col=3)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color=theme["text"])), name="distância atual", hoverinfo="skip", showlegend=False), row=2, col=3)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), showlegend=False), row=2, col=3)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False), row=2, col=3)
 
     frames: list[go.Frame] = []
     slider_steps = []
@@ -506,13 +531,13 @@ def build_animation_with_graphs(
                     ),
                     *build_vector_traces(row, vector_data),
                     go.Scatter(x=[0.07], y=[0.50], mode="text", text=[format_panel_text(row, object_name, gravity)], textposition="middle left", textfont=dict(size=15, color=LIGHT_TEXT), hoverinfo="skip", showlegend=False),
-                    go.Scatter(x=chart_df["t"], y=chart_df["speed"], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), name="|v| velocidade resultante"),
-                    go.Scatter(x=chart_df["t"], y=chart_df["vx"], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), name="vₓ componente horizontal"),
-                    go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), name="vᵧ componente vertical"),
+                    go.Scatter(x=chart_df["t"], y=chart_df["speed"], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), showlegend=False),
+                    go.Scatter(x=chart_df["t"], y=chart_df["vx"], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), showlegend=False),
+                    go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), showlegend=False),
                     go.Scatter(x=[row["t"], row["t"], row["t"]], y=[row["speed"], row["vx"], row["vy"]], mode="markers", marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR], line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
-                    go.Scatter(x=chart_df["t"], y=chart_df["y"], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"),
+                    go.Scatter(x=chart_df["t"], y=chart_df["y"], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), showlegend=False),
                     go.Scatter(x=[row["t"]], y=[row["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
-                    go.Scatter(x=chart_df["t"], y=chart_df["x"], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"),
+                    go.Scatter(x=chart_df["t"], y=chart_df["x"], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), showlegend=False),
                     go.Scatter(x=[row["t"]], y=[row["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
                 ],
             )
@@ -538,20 +563,13 @@ def build_animation_with_graphs(
     for subplot_ref in [("x3 domain", "y3 domain"), ("x4 domain", "y4 domain"), ("x5 domain", "y5 domain")]:
         fig.add_shape(type="rect", xref=subplot_ref[0], yref=subplot_ref[1], x0=0, x1=1, y0=0, y1=1, fillcolor=theme["plot_bg"], line=dict(width=0), layer="below")
 
+    add_local_graph_legends(fig, theme)
+
     fig.update_layout(
         template=theme["template"],
         height=900,
-        margin=dict(l=20, r=20, t=76, b=60),
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.04,
-            xanchor="center",
-            x=0.50,
-            font=dict(color=theme["text"], size=12),
-            bgcolor="rgba(0,0,0,0)",
-        ),
+        margin=dict(l=20, r=20, t=64, b=60),
+        showlegend=False,
         dragmode=False,
         plot_bgcolor=theme["plot_bg"],
         paper_bgcolor=theme["paper_bg"],
