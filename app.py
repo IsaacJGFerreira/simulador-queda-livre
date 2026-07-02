@@ -32,6 +32,10 @@ ANIMATION_PLOTLY_CONFIG = {
     ],
 }
 
+VECTOR_RESULTANT_COLOR = "#7E22CE"
+VECTOR_X_COLOR = "#2563EB"
+VECTOR_Y_COLOR = "#DC2626"
+
 
 st.set_page_config(
     page_title="Simulador de Queda Livre",
@@ -56,11 +60,153 @@ def format_panel_text(row: pd.Series, object_name: str, gravity: float) -> str:
         f"<b>{object_name}</b><br><br>"
         f"⏱ <b>Tempo:</b> {row['t']:.2f} s<br>"
         f"↕ <b>Altura:</b> {row['y']:.2f} m<br>"
-        f"⚡ <b>Velocidade:</b> {row['speed']:.2f} m/s<br>"
+        f"⚡ <b>|v|:</b> {row['speed']:.2f} m/s<br>"
+        f"<span style='color:{VECTOR_X_COLOR}'><b>vₓ:</b></span> {row['vx']:.2f} m/s<br>"
+        f"<span style='color:{VECTOR_Y_COLOR}'><b>vᵧ:</b></span> {row['vy']:.2f} m/s<br>"
         f"➡ <b>Distância horizontal:</b> {row['x']:.2f} m<br>"
         f"⬇ <b>Aceleração:</b> {gravity:.2f} m/s²<br>"
-        f"<br><b>Modelo:</b> queda livre ideal"
+        f"<br><b>Vetores:</b><br>"
+        f"<span style='color:{VECTOR_RESULTANT_COLOR}'><b>roxo:</b></span> velocidade resultante<br>"
+        f"<span style='color:{VECTOR_X_COLOR}'><b>azul:</b></span> componente horizontal<br>"
+        f"<span style='color:{VECTOR_Y_COLOR}'><b>vermelho:</b></span> componente vertical"
     )
+
+
+def marker_symbol_for_horizontal(value: float) -> str:
+    """Escolhe o símbolo da ponta do vetor horizontal."""
+    if value > 0:
+        return "triangle-right"
+    if value < 0:
+        return "triangle-left"
+    return "circle"
+
+
+def marker_symbol_for_vertical(value: float) -> str:
+    """Escolhe o símbolo da ponta do vetor vertical."""
+    if value > 0:
+        return "triangle-up"
+    if value < 0:
+        return "triangle-down"
+    return "circle"
+
+
+def vector_geometry(
+    row: pd.Series,
+    vector_scale: float,
+    scene_width: float,
+    scene_y_max: float,
+    max_speed: float,
+    max_abs_vx: float,
+    max_abs_vy: float,
+) -> dict[str, object]:
+    """Calcula posição, sentido, tamanho e largura dos vetores em um quadro."""
+    x = float(row["x"])
+    y = float(row["y"])
+    vx = float(row["vx"])
+    vy = float(row["vy"])
+    speed = float(row["speed"])
+
+    v_end = (x + vx * vector_scale, y + vy * vector_scale)
+    vx_end = (x + vx * vector_scale, y)
+    vy_end = (x, y + vy * vector_scale)
+
+    label_dx = 0.025 * scene_width
+    label_dy = 0.035 * scene_y_max
+
+    resultant_width = 2 + 4 * (speed / max_speed if max_speed > 0 else 0)
+    vx_width = 2 + 3 * (abs(vx) / max_abs_vx if max_abs_vx > 0 else 0)
+    vy_width = 2 + 3 * (abs(vy) / max_abs_vy if max_abs_vy > 0 else 0)
+
+    return {
+        "origin": (x, y),
+        "v_end": v_end,
+        "vx_end": vx_end,
+        "vy_end": vy_end,
+        "v_label": (v_end[0] + label_dx, v_end[1] + label_dy),
+        "vx_label": (vx_end[0] + label_dx, vx_end[1] + label_dy),
+        "vy_label": (vy_end[0] + label_dx, vy_end[1]),
+        "resultant_width": resultant_width,
+        "vx_width": vx_width,
+        "vy_width": vy_width,
+        "vx_symbol": marker_symbol_for_horizontal(vx),
+        "vy_symbol": marker_symbol_for_vertical(vy),
+    }
+
+
+def build_vector_traces(
+    row: pd.Series,
+    vector_data: dict[str, object],
+) -> list[go.Scatter]:
+    """Cria os traços dos vetores para a animação."""
+    x, y = vector_data["origin"]
+    vx_end = vector_data["vx_end"]
+    vy_end = vector_data["vy_end"]
+    v_end = vector_data["v_end"]
+    vx_label = vector_data["vx_label"]
+    vy_label = vector_data["vy_label"]
+    v_label = vector_data["v_label"]
+
+    return [
+        go.Scatter(
+            x=[x, v_end[0]],
+            y=[y, v_end[1]],
+            mode="lines",
+            line=dict(width=vector_data["resultant_width"], color=VECTOR_RESULTANT_COLOR),
+            hoverinfo="skip",
+        ),
+        go.Scatter(
+            x=[v_end[0]],
+            y=[v_end[1]],
+            mode="markers+text",
+            text=["v"],
+            textposition="top center",
+            textfont=dict(size=16, color=VECTOR_RESULTANT_COLOR),
+            marker=dict(size=14, color=VECTOR_RESULTANT_COLOR, symbol="diamond"),
+            hovertemplate=f"|v| = {row['speed']:.2f} m/s<extra></extra>",
+        ),
+        go.Scatter(
+            x=[x, vx_end[0]],
+            y=[y, vx_end[1]],
+            mode="lines",
+            line=dict(width=vector_data["vx_width"], color=VECTOR_X_COLOR, dash="dot"),
+            hoverinfo="skip",
+        ),
+        go.Scatter(
+            x=[vx_end[0]],
+            y=[vx_end[1]],
+            mode="markers+text",
+            text=["vₓ"],
+            textposition="top center",
+            textfont=dict(size=16, color=VECTOR_X_COLOR),
+            marker=dict(
+                size=14,
+                color=VECTOR_X_COLOR,
+                symbol=vector_data["vx_symbol"],
+            ),
+            hovertemplate=f"vₓ = {row['vx']:.2f} m/s<extra></extra>",
+        ),
+        go.Scatter(
+            x=[x, vy_end[0]],
+            y=[y, vy_end[1]],
+            mode="lines",
+            line=dict(width=vector_data["vy_width"], color=VECTOR_Y_COLOR, dash="dot"),
+            hoverinfo="skip",
+        ),
+        go.Scatter(
+            x=[vy_end[0]],
+            y=[vy_end[1]],
+            mode="markers+text",
+            text=["vᵧ"],
+            textposition="middle right",
+            textfont=dict(size=16, color=VECTOR_Y_COLOR),
+            marker=dict(
+                size=14,
+                color=VECTOR_Y_COLOR,
+                symbol=vector_data["vy_symbol"],
+            ),
+            hovertemplate=f"vᵧ = {row['vy']:.2f} m/s<extra></extra>",
+        ),
+    ]
 
 
 def build_visual_animation_figure(
@@ -88,14 +234,29 @@ def build_visual_animation_figure(
 
     scene_width = scene_x_max - scene_x_min
     panel_gap = 0.08 * scene_width
-    panel_width = 0.55 * scene_width
+    panel_width = 0.65 * scene_width
     panel_x_min = scene_x_max + panel_gap
     panel_x_max = panel_x_min + panel_width
     panel_x_text = panel_x_min + 0.08 * panel_width
-    panel_y_text = 0.58 * scene_y_max
+    panel_y_text = 0.55 * scene_y_max
+
+    max_speed = max(float(anim_df["speed"].max()), 1e-9)
+    max_abs_vx = max(float(anim_df["vx"].abs().max()), 1e-9)
+    max_abs_vy = max(float(anim_df["vy"].abs().max()), 1e-9)
+    vector_reference_length = max(0.12 * scene_y_max, min(0.24 * scene_y_max, 0.20 * scene_width))
+    vector_scale = vector_reference_length / max_speed
 
     initial = anim_df.iloc[0]
     initial_text = format_panel_text(initial, object_name, gravity)
+    initial_vector_data = vector_geometry(
+        row=initial,
+        vector_scale=vector_scale,
+        scene_width=scene_width,
+        scene_y_max=scene_y_max,
+        max_speed=max_speed,
+        max_abs_vx=max_abs_vx,
+        max_abs_vy=max_abs_vy,
+    )
 
     frames: list[go.Frame] = []
     slider_steps = []
@@ -103,6 +264,15 @@ def build_visual_animation_figure(
     for index, row in anim_df.iterrows():
         trail_df = anim_df.iloc[: index + 1]
         frame_name = str(index)
+        vector_data = vector_geometry(
+            row=row,
+            vector_scale=vector_scale,
+            scene_width=scene_width,
+            scene_y_max=scene_y_max,
+            max_speed=max_speed,
+            max_abs_vx=max_abs_vx,
+            max_abs_vy=max_abs_vy,
+        )
 
         frames.append(
             go.Frame(
@@ -131,13 +301,14 @@ def build_visual_animation_figure(
                         ),
                         customdata=[[row["t"], row["speed"]]],
                     ),
+                    *build_vector_traces(row, vector_data),
                     go.Scatter(
                         x=[panel_x_text],
                         y=[panel_y_text],
                         mode="text",
                         text=[format_panel_text(row, object_name, gravity)],
                         textposition="middle left",
-                        textfont=dict(size=17, color="#1F2937"),
+                        textfont=dict(size=16, color="#1F2937"),
                         hoverinfo="skip",
                     ),
                 ],
@@ -187,6 +358,7 @@ def build_visual_animation_figure(
                 ),
                 customdata=[[initial["t"], initial["speed"]]],
             ),
+            *build_vector_traces(initial, initial_vector_data),
             go.Scatter(
                 x=[panel_x_text],
                 y=[panel_y_text],
@@ -194,7 +366,7 @@ def build_visual_animation_figure(
                 name="Painel",
                 text=[initial_text],
                 textposition="middle left",
-                textfont=dict(size=17, color="#1F2937"),
+                textfont=dict(size=16, color="#1F2937"),
                 hoverinfo="skip",
             ),
         ],
@@ -202,10 +374,10 @@ def build_visual_animation_figure(
     )
 
     fig.update_layout(
-        height=560,
+        height=600,
         margin=dict(l=20, r=20, t=60, b=40),
         title=dict(
-            text="Animação visual da queda livre",
+            text="Animação visual da queda livre com vetores",
             x=0.02,
             xanchor="left",
         ),
@@ -272,7 +444,7 @@ def build_visual_animation_figure(
         annotations=[
             dict(
                 x=(panel_x_min + panel_x_max) / 2,
-                y=scene_y_max * 0.95,
+                y=scene_y_max * 0.96,
                 text="<b>Painel da queda</b>",
                 showarrow=False,
                 font=dict(size=20, color="#111827"),
@@ -468,18 +640,22 @@ impact = df.iloc[-1]
 metric_cols = st.columns(5)
 metric_cols[0].metric("Tempo de queda", f"{impact['t']:.2f} s")
 metric_cols[1].metric("Velocidade final", f"{impact['speed']:.2f} m/s")
-metric_cols[2].metric("Altura inicial", f"{initial_height:.2f} m")
-metric_cols[3].metric("Distância horizontal", f"{impact['x']:.2f} m")
+metric_cols[2].metric("vₓ final", f"{impact['vx']:.2f} m/s")
+metric_cols[3].metric("vᵧ final", f"{impact['vy']:.2f} m/s")
 metric_cols[4].metric("Gravidade", f"{gravity:.2f} m/s²")
 
 st.info(
     "Nesta versão didática, a resistência do ar e o vento foram removidos. "
-    "O movimento é calculado considerando apenas a ação da gravidade."
+    "O movimento é calculado considerando apenas a ação da gravidade. "
+    "Os vetores mostram a velocidade resultante e suas componentes horizontal e vertical."
 )
 
 st.divider()
-st.subheader("Animação visual 2D")
-st.caption("Cena simplificada com céu, solo, corpo em queda, rastro e painel lateral.")
+st.subheader("Animação visual 2D com vetores")
+st.caption(
+    "O vetor roxo representa a velocidade resultante; o azul mostra vₓ; "
+    "o vermelho mostra vᵧ. O tamanho e a espessura variam durante a queda."
+)
 
 animation_fig = build_visual_animation_figure(
     full_df=df,
@@ -500,8 +676,20 @@ with left:
     fig_y = px.line(df, x="t", y="y", labels={"t": "Tempo (s)", "y": "Altura (m)"})
     st.plotly_chart(fig_y, use_container_width=True)
 
-    st.subheader("Velocidade × tempo")
-    fig_speed = px.line(df, x="t", y="speed", labels={"t": "Tempo (s)", "speed": "Velocidade (m/s)"})
+    st.subheader("Componentes da velocidade × tempo")
+    velocity_df = df[["t", "speed", "vx", "vy"]].rename(
+        columns={
+            "speed": "|v| velocidade resultante",
+            "vx": "vₓ componente horizontal",
+            "vy": "vᵧ componente vertical",
+        }
+    )
+    fig_speed = px.line(
+        velocity_df,
+        x="t",
+        y=["|v| velocidade resultante", "vₓ componente horizontal", "vᵧ componente vertical"],
+        labels={"t": "Tempo (s)", "value": "Velocidade (m/s)", "variable": "Grandeza"},
+    )
     st.plotly_chart(fig_speed, use_container_width=True)
 
 with right:
@@ -528,10 +716,10 @@ with st.expander("Ver tabela da simulação"):
 with st.expander("Interpretação física"):
     st.markdown(
         """
-        - A queda livre ideal considera apenas a força gravitacional.
-        - A aceleração vertical é constante e aponta para baixo.
-        - Se a velocidade vertical inicial for zero, o corpo parte do repouso e acelera durante a queda.
-        - A massa e o formato do objeto não alteram o tempo de queda nesse modelo ideal.
-        - A velocidade horizontal inicial, quando diferente de zero, cria uma trajetória em duas dimensões.
+        - A velocidade resultante é formada pelas componentes horizontal e vertical.
+        - A componente horizontal `vₓ` permanece constante quando não há resistência do ar.
+        - A componente vertical `vᵧ` muda continuamente por causa da aceleração da gravidade.
+        - O vetor resultante muda de tamanho, direção e sentido conforme `vₓ` e `vᵧ` se combinam.
+        - Se `vₓ = 0`, o movimento é uma queda vertical pura; se `vₓ ≠ 0`, o movimento se torna bidimensional.
         """
     )
