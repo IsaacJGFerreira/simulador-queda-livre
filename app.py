@@ -33,13 +33,18 @@ ANIMATION_PLOTLY_CONFIG = {
     ],
 }
 
-VECTOR_RESULTANT_COLOR = "#7E22CE"
-VECTOR_X_COLOR = "#2563EB"
-VECTOR_Y_COLOR = "#DC2626"
+VECTOR_RESULTANT_COLOR = "#A855F7"
+VECTOR_X_COLOR = "#3B82F6"
+VECTOR_Y_COLOR = "#FCA5A5"
 OBJECT_COLOR = "#FF7043"
 HEIGHT_COLOR = "#22D3EE"
 DISTANCE_COLOR = "#34D399"
+LIGHT_BG = "#FFFFFF"
+LIGHT_PANEL = "#F8FAFC"
+LIGHT_GRID = "#CBD5E1"
+LIGHT_TEXT = "#0F172A"
 DARK_BG = "#0E1117"
+DARK_PANEL = "#111827"
 DARK_GRID = "#374151"
 DARK_TEXT = "#F9FAFB"
 
@@ -54,72 +59,132 @@ st.markdown(
     """
     <style>
     .block-container {
-        padding-top: 1.4rem;
+        padding-top: 1.25rem;
         padding-bottom: 2rem;
         max-width: 1500px;
     }
+
     .hero-card {
-        background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 55%, #38BDF8 100%);
+        background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 58%, #38BDF8 100%);
         padding: 26px 32px;
         border-radius: 22px;
-        color: white;
-        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+        color: #FFFFFF;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.24);
         margin-bottom: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
     }
     .hero-title {
         font-size: 2.35rem;
         font-weight: 850;
         margin-bottom: 8px;
         letter-spacing: -0.03em;
+        color: #FFFFFF;
     }
     .hero-subtitle {
         font-size: 1.08rem;
-        opacity: 0.94;
-        max-width: 980px;
+        color: rgba(255, 255, 255, 0.94);
+        max-width: 1050px;
         line-height: 1.45;
     }
+
     .section-card {
-        background: #FFFFFF;
-        border: 1px solid #E5E7EB;
+        background: var(--secondary-background-color);
+        border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 18px;
         padding: 18px 22px;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
-        margin: 12px 0 18px 0;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+        margin: 14px 0 18px 0;
     }
     .section-title {
         font-size: 1.28rem;
         font-weight: 780;
-        color: #111827;
+        color: var(--text-color);
         margin-bottom: 4px;
     }
     .section-subtitle {
         font-size: 0.98rem;
-        color: #4B5563;
+        color: var(--text-color);
+        opacity: 0.82;
         line-height: 1.45;
     }
+
     div[data-testid="stMetric"] {
-        background: #FFFFFF;
-        border: 1px solid #E5E7EB;
+        background: var(--secondary-background-color);
+        border: 1px solid rgba(148, 163, 184, 0.35);
         border-radius: 16px;
         padding: 14px 16px;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
+    div[data-testid="stMetricLabel"] {
+        color: var(--text-color) !important;
+        opacity: 0.72;
     }
     div[data-testid="stMetricValue"] {
+        color: var(--text-color) !important;
         font-weight: 780;
     }
+
     [data-testid="stSidebar"] {
-        background: #F8FAFC;
-        border-right: 1px solid #E5E7EB;
+        background: var(--secondary-background-color);
+        border-right: 1px solid rgba(148, 163, 184, 0.25);
     }
-    .small-note {
-        color: #475569;
-        font-size: 0.94rem;
+
+    .tip-box {
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        border-left: 5px solid #3B82F6;
+        color: var(--text-color);
+        padding: 14px 18px;
+        border-radius: 14px;
+        margin: 12px 0 18px 0;
         line-height: 1.45;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+def current_streamlit_theme_base() -> str:
+    """Tenta ler o tema configurado no Streamlit."""
+    try:
+        return str(st.get_option("theme.base") or "dark").lower()
+    except Exception:
+        return "dark"
+
+
+def resolve_plot_theme(theme_choice: str) -> dict[str, str]:
+    """Resolve cores dos gráficos a partir da escolha do usuário."""
+    if theme_choice == "Automático":
+        base = current_streamlit_theme_base()
+        is_dark = base != "light"
+    else:
+        is_dark = theme_choice == "Escuro"
+
+    if is_dark:
+        return {
+            "template": "plotly_dark",
+            "paper_bg": DARK_BG,
+            "plot_bg": DARK_BG,
+            "panel_bg": DARK_PANEL,
+            "grid": DARK_GRID,
+            "text": DARK_TEXT,
+            "scene_bg": "#EAF7FF",
+            "scene_text": LIGHT_TEXT,
+            "scene_panel": "#FFFFFF",
+        }
+
+    return {
+        "template": "plotly_white",
+        "paper_bg": LIGHT_BG,
+        "plot_bg": LIGHT_BG,
+        "panel_bg": LIGHT_PANEL,
+        "grid": LIGHT_GRID,
+        "text": LIGHT_TEXT,
+        "scene_bg": "#EAF7FF",
+        "scene_text": LIGHT_TEXT,
+        "scene_panel": "#FFFFFF",
+    }
 
 
 def sample_simulation_frames(df: pd.DataFrame, max_frames: int = 120) -> pd.DataFrame:
@@ -141,12 +206,12 @@ def format_panel_text(row: pd.Series, object_name: str, gravity: float) -> str:
         f"↔ <b>Distância:</b> {row['x']:.2f} m<br>"
         f"⚡ <b>|v|:</b> {row['speed']:.2f} m/s<br>"
         f"<span style='color:{VECTOR_X_COLOR}'><b>vₓ:</b></span> {row['vx']:.2f} m/s<br>"
-        f"<span style='color:{VECTOR_Y_COLOR}'><b>vᵧ:</b></span> {row['vy']:.2f} m/s<br>"
+        f"<span style='color:#DC2626'><b>vᵧ:</b></span> {row['vy']:.2f} m/s<br>"
         f"⬇ <b>Aceleração:</b> {gravity:.2f} m/s²<br>"
         f"<br><b>Vetores:</b><br>"
         f"<span style='color:{VECTOR_RESULTANT_COLOR}'><b>roxo:</b></span> velocidade resultante<br>"
         f"<span style='color:{VECTOR_X_COLOR}'><b>azul:</b></span> componente horizontal<br>"
-        f"<span style='color:{VECTOR_Y_COLOR}'><b>vermelho:</b></span> componente vertical"
+        f"<span style='color:#DC2626'><b>vermelho:</b></span> componente vertical"
     )
 
 
@@ -245,7 +310,7 @@ def build_vector_traces(row: pd.Series, vector_data: dict[str, object]) -> list[
             x=[x, vy_end[0]],
             y=[y, vy_end[1]],
             mode="lines",
-            line=dict(width=vector_data["vy_width"], color=VECTOR_Y_COLOR, dash="dot"),
+            line=dict(width=vector_data["vy_width"], color="#DC2626", dash="dot"),
             hoverinfo="skip",
             showlegend=False,
         ),
@@ -255,46 +320,47 @@ def build_vector_traces(row: pd.Series, vector_data: dict[str, object]) -> list[
             mode="markers+text",
             text=["vᵧ"],
             textposition="middle right",
-            textfont=dict(size=15, color=VECTOR_Y_COLOR),
-            marker=dict(size=14, color=VECTOR_Y_COLOR, symbol=vector_data["vy_symbol"]),
+            textfont=dict(size=15, color="#DC2626"),
+            marker=dict(size=14, color="#DC2626", symbol=vector_data["vy_symbol"]),
             hovertemplate=f"vᵧ = {row['vy']:.2f} m/s<extra></extra>",
             showlegend=False,
         ),
     ]
 
 
-def style_dark_axes(fig: go.Figure, row: int, col: int, x_title: str, y_title: str) -> None:
-    """Aplica estilo escuro aos gráficos didáticos."""
+def style_axes(fig: go.Figure, row: int, col: int, x_title: str, y_title: str, theme: dict[str, str]) -> None:
+    """Aplica estilo aos eixos dos gráficos."""
     fig.update_xaxes(
         title=x_title,
-        gridcolor=DARK_GRID,
-        zerolinecolor=DARK_GRID,
-        color=DARK_TEXT,
-        title_font=dict(color=DARK_TEXT),
-        tickfont=dict(color=DARK_TEXT),
+        gridcolor=theme["grid"],
+        zerolinecolor=theme["grid"],
+        color=theme["text"],
+        title_font=dict(color=theme["text"]),
+        tickfont=dict(color=theme["text"]),
         fixedrange=True,
         row=row,
         col=col,
     )
     fig.update_yaxes(
         title=y_title,
-        gridcolor=DARK_GRID,
-        zerolinecolor=DARK_GRID,
-        color=DARK_TEXT,
-        title_font=dict(color=DARK_TEXT),
-        tickfont=dict(color=DARK_TEXT),
+        gridcolor=theme["grid"],
+        zerolinecolor=theme["grid"],
+        color=theme["text"],
+        title_font=dict(color=theme["text"]),
+        tickfont=dict(color=theme["text"]),
         fixedrange=True,
         row=row,
         col=col,
     )
 
 
-def build_animation_with_dark_graphs(
+def build_animation_with_graphs(
     full_df: pd.DataFrame,
     object_name: str,
     gravity: float,
+    theme: dict[str, str],
 ) -> go.Figure:
-    """Animação com cena grande e gráficos escuros construídos simultaneamente."""
+    """Animação com cena grande e gráficos construídos simultaneamente."""
     anim_df = sample_simulation_frames(full_df, max_frames=120)
 
     scene_y_max = max(float(anim_df["y"].max()), 1.0)
@@ -344,14 +410,11 @@ def build_animation_with_dark_graphs(
     fig = make_subplots(
         rows=2,
         cols=3,
-        specs=[
-            [{"colspan": 2}, None, {}],
-            [{}, {}, {}],
-        ],
+        specs=[[{"colspan": 2}, None, {}], [{}, {}, {}]],
         row_heights=[0.62, 0.38],
         column_widths=[0.34, 0.34, 0.32],
         horizontal_spacing=0.06,
-        vertical_spacing=0.17,
+        vertical_spacing=0.20,
         subplot_titles=(
             "Animação visual da queda livre com vetores",
             "Painel da queda",
@@ -382,12 +445,12 @@ def build_animation_with_dark_graphs(
 
     fig.add_trace(
         go.Scatter(
-            x=[0.05],
+            x=[0.07],
             y=[0.50],
             mode="text",
             text=[format_panel_text(initial, object_name, gravity)],
             textposition="middle left",
-            textfont=dict(size=15, color="#1F2937"),
+            textfont=dict(size=15, color=LIGHT_TEXT),
             hoverinfo="skip",
             showlegend=False,
         ),
@@ -397,13 +460,13 @@ def build_animation_with_dark_graphs(
 
     fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["speed"]], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), name="|v| velocidade resultante"), row=2, col=1)
     fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vx"]], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), name="vₓ componente horizontal"), row=2, col=1)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vy"]], mode="lines", line=dict(width=3, color="#FCA5A5"), name="vᵧ componente vertical"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["vy"]], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), name="vᵧ componente vertical"), row=2, col=1)
     fig.add_trace(
         go.Scatter(
             x=[initial["t"], initial["t"], initial["t"]],
             y=[initial["speed"], initial["vx"], initial["vy"]],
             mode="markers",
-            marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, "#FCA5A5"], line=dict(width=1, color="#F9FAFB")),
+            marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR], line=dict(width=1, color=theme["text"])),
             name="valores atuais",
             hoverinfo="skip",
             showlegend=False,
@@ -413,10 +476,10 @@ def build_animation_with_dark_graphs(
     )
 
     fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"), row=2, col=2)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color="#F9FAFB")), name="altura atual", hoverinfo="skip", showlegend=False), row=2, col=2)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color=theme["text"])), name="altura atual", hoverinfo="skip", showlegend=False), row=2, col=2)
 
     fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"), row=2, col=3)
-    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color="#F9FAFB")), name="distância atual", hoverinfo="skip", showlegend=False), row=2, col=3)
+    fig.add_trace(go.Scatter(x=[initial["t"]], y=[initial["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color=theme["text"])), name="distância atual", hoverinfo="skip", showlegend=False), row=2, col=3)
 
     frames: list[go.Frame] = []
     slider_steps = []
@@ -425,13 +488,7 @@ def build_animation_with_dark_graphs(
         trail_df = anim_df.iloc[: index + 1]
         chart_df = anim_df.iloc[: index + 1]
         frame_name = str(index)
-        vector_data = vector_geometry(
-            row=row,
-            vector_scale=vector_scale,
-            max_speed=max_speed,
-            max_abs_vx=max_abs_vx,
-            max_abs_vy=max_abs_vy,
-        )
+        vector_data = vector_geometry(row, vector_scale, max_speed, max_abs_vx, max_abs_vy)
 
         frames.append(
             go.Frame(
@@ -448,15 +505,15 @@ def build_animation_with_dark_graphs(
                         showlegend=False,
                     ),
                     *build_vector_traces(row, vector_data),
-                    go.Scatter(x=[0.05], y=[0.50], mode="text", text=[format_panel_text(row, object_name, gravity)], textposition="middle left", textfont=dict(size=15, color="#1F2937"), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=[0.07], y=[0.50], mode="text", text=[format_panel_text(row, object_name, gravity)], textposition="middle left", textfont=dict(size=15, color=LIGHT_TEXT), hoverinfo="skip", showlegend=False),
                     go.Scatter(x=chart_df["t"], y=chart_df["speed"], mode="lines", line=dict(width=4, color=VECTOR_RESULTANT_COLOR), name="|v| velocidade resultante"),
                     go.Scatter(x=chart_df["t"], y=chart_df["vx"], mode="lines", line=dict(width=3, color=VECTOR_X_COLOR), name="vₓ componente horizontal"),
-                    go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color="#FCA5A5"), name="vᵧ componente vertical"),
-                    go.Scatter(x=[row["t"], row["t"], row["t"]], y=[row["speed"], row["vx"], row["vy"]], mode="markers", marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, "#FCA5A5"], line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=chart_df["t"], y=chart_df["vy"], mode="lines", line=dict(width=3, color=VECTOR_Y_COLOR), name="vᵧ componente vertical"),
+                    go.Scatter(x=[row["t"], row["t"], row["t"]], y=[row["speed"], row["vx"], row["vy"]], mode="markers", marker=dict(size=9, color=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR], line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
                     go.Scatter(x=chart_df["t"], y=chart_df["y"], mode="lines", line=dict(width=4, color=HEIGHT_COLOR), name="altura"),
-                    go.Scatter(x=[row["t"]], y=[row["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=[row["t"]], y=[row["y"]], mode="markers", marker=dict(size=9, color=HEIGHT_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
                     go.Scatter(x=chart_df["t"], y=chart_df["x"], mode="lines", line=dict(width=4, color=DISTANCE_COLOR), name="distância horizontal"),
-                    go.Scatter(x=[row["t"]], y=[row["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color="#F9FAFB")), hoverinfo="skip", showlegend=False),
+                    go.Scatter(x=[row["t"]], y=[row["x"]], mode="markers", marker=dict(size=9, color=DISTANCE_COLOR, line=dict(width=1, color=theme["text"])), hoverinfo="skip", showlegend=False),
                 ],
             )
         )
@@ -466,55 +523,46 @@ def build_animation_with_dark_graphs(
                 {
                     "method": "animate",
                     "label": f"{row['t']:.1f}s",
-                    "args": [
-                        [frame_name],
-                        {
-                            "mode": "immediate",
-                            "frame": {"duration": 0, "redraw": True},
-                            "transition": {"duration": 0},
-                        },
-                    ],
+                    "args": [[frame_name], {"mode": "immediate", "frame": {"duration": 0, "redraw": True}, "transition": {"duration": 0}}],
                 }
             )
 
     fig.frames = frames
 
-    fig.add_shape(type="rect", x0=scene_x_min, x1=scene_x_max, y0=0, y1=scene_y_top, fillcolor="#EAF7FF", line=dict(width=0), layer="below", row=1, col=1)
+    fig.add_shape(type="rect", x0=scene_x_min, x1=scene_x_max, y0=0, y1=scene_y_top, fillcolor=theme["scene_bg"], line=dict(width=0), layer="below", row=1, col=1)
     fig.add_shape(type="rect", x0=scene_x_min, x1=scene_x_max, y0=scene_y_min, y1=0, fillcolor="#7CB342", line=dict(width=0), layer="below", row=1, col=1)
     fig.add_shape(type="line", x0=scene_x_min, x1=scene_x_max, y0=0, y1=0, line=dict(width=5, color="#33691E"), layer="above", row=1, col=1)
-    fig.add_shape(type="rect", x0=0, x1=1, y0=0, y1=1, fillcolor="#FFFFFF", line=dict(width=2, color="#CBD5E1"), layer="below", row=1, col=3)
+    fig.add_shape(type="rect", x0=0, x1=1, y0=0, y1=1, fillcolor=theme["scene_panel"], line=dict(width=2, color="#CBD5E1"), layer="below", row=1, col=3)
     fig.add_annotation(x=(scene_x_min + scene_x_max) / 2, y=scene_y_min * 0.55, text="<b>SOLO</b>", showarrow=False, font=dict(size=15, color="#1B5E20"), row=1, col=1)
 
     for subplot_ref in [("x3 domain", "y3 domain"), ("x4 domain", "y4 domain"), ("x5 domain", "y5 domain")]:
-        fig.add_shape(
-            type="rect",
-            xref=subplot_ref[0],
-            yref=subplot_ref[1],
-            x0=0,
-            x1=1,
-            y0=0,
-            y1=1,
-            fillcolor=DARK_BG,
-            line=dict(width=0),
-            layer="below",
-        )
+        fig.add_shape(type="rect", xref=subplot_ref[0], yref=subplot_ref[1], x0=0, x1=1, y0=0, y1=1, fillcolor=theme["plot_bg"], line=dict(width=0), layer="below")
 
     fig.update_layout(
+        template=theme["template"],
         height=900,
-        margin=dict(l=20, r=20, t=72, b=58),
+        margin=dict(l=20, r=20, t=76, b=60),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0, font=dict(color="#111827")),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.04,
+            xanchor="center",
+            x=0.50,
+            font=dict(color=theme["text"], size=12),
+            bgcolor="rgba(0,0,0,0)",
+        ),
         dragmode=False,
-        plot_bgcolor="#FFFFFF",
-        paper_bgcolor="#FFFFFF",
-        font=dict(color="#111827"),
+        plot_bgcolor=theme["plot_bg"],
+        paper_bgcolor=theme["paper_bg"],
+        font=dict(color=theme["text"]),
         updatemenus=[
             {
                 "type": "buttons",
                 "showactive": False,
                 "direction": "left",
                 "x": 0.02,
-                "y": -0.07,
+                "y": -0.075,
                 "xanchor": "left",
                 "yanchor": "top",
                 "bgcolor": "#1D4ED8",
@@ -525,15 +573,7 @@ def build_animation_with_dark_graphs(
                     {
                         "label": "▶ Play",
                         "method": "animate",
-                        "args": [
-                            None,
-                            {
-                                "frame": {"duration": ANIMATION_FRAME_DURATION_MS, "redraw": True},
-                                "fromcurrent": True,
-                                "transition": {"duration": 0},
-                                "mode": "immediate",
-                            },
-                        ],
+                        "args": [None, {"frame": {"duration": ANIMATION_FRAME_DURATION_MS, "redraw": True}, "fromcurrent": True, "transition": {"duration": 0}, "mode": "immediate"}],
                     },
                     {
                         "label": "⏸ Pausar",
@@ -547,7 +587,7 @@ def build_animation_with_dark_graphs(
             {
                 "active": 0,
                 "x": 0.18,
-                "y": -0.07,
+                "y": -0.075,
                 "xanchor": "left",
                 "yanchor": "top",
                 "len": 0.76,
@@ -555,7 +595,7 @@ def build_animation_with_dark_graphs(
                 "bgcolor": "#E5E7EB",
                 "activebgcolor": "#1D4ED8",
                 "bordercolor": "#CBD5E1",
-                "currentvalue": {"prefix": "Tempo: ", "suffix": "", "font": {"size": 14, "color": "#111827"}},
+                "currentvalue": {"prefix": "Tempo: ", "suffix": "", "font": {"size": 14, "color": theme["text"]}},
                 "steps": slider_steps,
             }
         ],
@@ -566,9 +606,9 @@ def build_animation_with_dark_graphs(
     fig.update_xaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=3)
     fig.update_yaxes(range=[0, 1], showgrid=False, zeroline=False, title="", showticklabels=False, fixedrange=True, row=1, col=3)
 
-    style_dark_axes(fig, row=2, col=1, x_title="Tempo (s)", y_title="Velocidade (m/s)")
-    style_dark_axes(fig, row=2, col=2, x_title="Tempo (s)", y_title="Altura (m)")
-    style_dark_axes(fig, row=2, col=3, x_title="Tempo (s)", y_title="Distância horizontal (m)")
+    style_axes(fig, row=2, col=1, x_title="Tempo (s)", y_title="Velocidade (m/s)", theme=theme)
+    style_axes(fig, row=2, col=2, x_title="Tempo (s)", y_title="Altura (m)", theme=theme)
+    style_axes(fig, row=2, col=3, x_title="Tempo (s)", y_title="Distância horizontal (m)", theme=theme)
 
     fig.update_xaxes(range=[0, time_max * 1.02], row=2, col=1)
     fig.update_yaxes(range=[velocity_min - velocity_margin, velocity_max + velocity_margin], row=2, col=1)
@@ -577,6 +617,28 @@ def build_animation_with_dark_graphs(
     fig.update_xaxes(range=[0, time_max * 1.02], row=2, col=3)
     fig.update_yaxes(range=[distance_min - distance_margin, distance_max + distance_margin], row=2, col=3)
 
+    return fig
+
+
+def apply_theme_to_fig(fig: go.Figure, theme: dict[str, str]) -> go.Figure:
+    """Padroniza os gráficos completos com o tema escolhido."""
+    fig.update_layout(
+        template=theme["template"],
+        paper_bgcolor=theme["paper_bg"],
+        plot_bgcolor=theme["plot_bg"],
+        font=dict(color=theme["text"]),
+        legend=dict(
+            font=dict(color=theme["text"]),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
+    )
+    fig.update_xaxes(gridcolor=theme["grid"], zerolinecolor=theme["grid"], color=theme["text"], title_font=dict(color=theme["text"]), tickfont=dict(color=theme["text"]))
+    fig.update_yaxes(gridcolor=theme["grid"], zerolinecolor=theme["grid"], color=theme["text"], title_font=dict(color=theme["text"]), tickfont=dict(color=theme["text"]))
     return fig
 
 
@@ -596,6 +658,14 @@ st.markdown(
 with st.sidebar:
     st.header("⚙️ Configuração da queda")
 
+    theme_choice = st.radio(
+        "Tema dos gráficos",
+        options=["Automático", "Escuro", "Claro"],
+        index=0,
+        help="Use Escuro se estiver usando o modo escuro do app e algum gráfico não acompanhar automaticamente.",
+    )
+    resolved_theme = resolve_plot_theme(theme_choice)
+
     preset_name = st.selectbox(
         "Objeto visual",
         options=list(OBJECT_PRESETS.keys()) + ["Personalizado"],
@@ -612,12 +682,7 @@ with st.sidebar:
 
     st.header("📌 Condições iniciais")
     initial_height = st.number_input("Altura inicial (m)", min_value=0.1, value=100.0, step=10.0)
-    initial_vx = st.number_input(
-        "Velocidade horizontal inicial (m/s)",
-        value=0.0,
-        step=1.0,
-        help="Use zero para queda vertical pura. Valores diferentes de zero mostram um lançamento horizontal.",
-    )
+    initial_vx = st.number_input("Velocidade horizontal inicial (m/s)", value=0.0, step=1.0, help="Use zero para queda vertical pura. Valores diferentes de zero mostram um lançamento horizontal.")
     initial_vy = st.number_input("Velocidade vertical inicial (m/s)", value=0.0, step=1.0, help="Valor positivo para cima e negativo para baixo.")
     gravity = st.number_input("Aceleração da gravidade g (m/s²)", min_value=0.0, value=9.81, step=0.01)
 
@@ -660,10 +725,19 @@ metric_cols[4].metric("Distância final", f"{impact['x']:.2f} m")
 
 st.markdown(
     """
+    <div class="tip-box">
+        <b>Dica didática:</b> coloque uma velocidade horizontal inicial diferente de zero para visualizar melhor a decomposição da velocidade em <b>vₓ</b> e <b>vᵧ</b>.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
     <div class="section-card">
         <div class="section-title">Animação com gráficos sincronizados</div>
         <div class="section-subtitle">
-            A cena da queda aparece no topo. Abaixo dela, os gráficos escuros de componentes da velocidade,
+            A cena da queda aparece no topo. Abaixo dela, os gráficos de componentes da velocidade,
             altura e distância horizontal são desenhados ao mesmo tempo que o corpo se movimenta.
         </div>
     </div>
@@ -671,7 +745,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-animation_fig = build_animation_with_dark_graphs(full_df=df, object_name=falling_object.name, gravity=gravity)
+animation_fig = build_animation_with_graphs(full_df=df, object_name=falling_object.name, gravity=gravity, theme=resolved_theme)
 st.plotly_chart(animation_fig, use_container_width=True, config=ANIMATION_PLOTLY_CONFIG)
 
 st.markdown(
@@ -690,29 +764,27 @@ left, middle, right = st.columns(3)
 
 with left:
     st.subheader("Componentes da velocidade × tempo")
-    velocity_df = df[["t", "speed", "vx", "vy"]].rename(
-        columns={"speed": "|v| velocidade resultante", "vx": "vₓ componente horizontal", "vy": "vᵧ componente vertical"}
-    )
+    velocity_df = df[["t", "speed", "vx", "vy"]].rename(columns={"speed": "|v| velocidade resultante", "vx": "vₓ componente horizontal", "vy": "vᵧ componente vertical"})
     fig_speed = px.line(
         velocity_df,
         x="t",
         y=["|v| velocidade resultante", "vₓ componente horizontal", "vᵧ componente vertical"],
         labels={"t": "Tempo (s)", "value": "Velocidade (m/s)", "variable": "Grandeza"},
-        template="plotly_dark",
+        color_discrete_sequence=[VECTOR_RESULTANT_COLOR, VECTOR_X_COLOR, VECTOR_Y_COLOR],
     )
-    st.plotly_chart(fig_speed, use_container_width=True)
+    st.plotly_chart(apply_theme_to_fig(fig_speed, resolved_theme), use_container_width=True)
 
 with middle:
     st.subheader("Altura × tempo")
-    fig_height = px.line(df, x="t", y="y", labels={"t": "Tempo (s)", "y": "Altura (m)"}, template="plotly_dark")
+    fig_height = px.line(df, x="t", y="y", labels={"t": "Tempo (s)", "y": "Altura (m)"})
     fig_height.update_traces(line=dict(color=HEIGHT_COLOR, width=4))
-    st.plotly_chart(fig_height, use_container_width=True)
+    st.plotly_chart(apply_theme_to_fig(fig_height, resolved_theme), use_container_width=True)
 
 with right:
     st.subheader("Distância horizontal × tempo")
-    fig_distance = px.line(df, x="t", y="x", labels={"t": "Tempo (s)", "x": "Distância horizontal (m)"}, template="plotly_dark")
+    fig_distance = px.line(df, x="t", y="x", labels={"t": "Tempo (s)", "x": "Distância horizontal (m)"})
     fig_distance.update_traces(line=dict(color=DISTANCE_COLOR, width=4))
-    st.plotly_chart(fig_distance, use_container_width=True)
+    st.plotly_chart(apply_theme_to_fig(fig_distance, resolved_theme), use_container_width=True)
 
 with st.expander("Ver tabela da simulação"):
     st.dataframe(df, use_container_width=True)
